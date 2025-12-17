@@ -372,6 +372,10 @@
                         </div>
 
                         <div v-else-if="!isShared" class="space-y-2">
+                            <!-- 新增：即使未上傳也顯示目前的 Local Trip ID -->
+                            <div class="text-xs text-center text-slate-400 mb-1">
+                                準備上傳行程: <span class="font-mono font-bold select-all text-slate-600">{{ currentTripId }}</span>
+                            </div>
                             <button @click="startSharing" class="w-full py-2 bg-indigo-500 text-white text-sm font-bold rounded-lg shadow-md hover:bg-indigo-600 transition flex items-center justify-center gap-2">
                                 <i class="ph-bold ph-upload-simple"></i> 上傳並開啟協作
                             </button>
@@ -717,10 +721,11 @@
                         }
 
                         localStorage.setItem('travel_app_firebase_config', JSON.stringify(config));
-                        // Auto-open menu on next load
                         localStorage.setItem('travel_app_open_menu', 'true');
                         
-                        alert('設定已儲存！頁面將重新整理。\n\n重整後，請再次打開選單，點擊「上傳並開啟協作」來取得行程 ID。');
+                        // Updated alert message to show Trip ID
+                        alert(`設定已儲存！頁面將重新整理。\n\n您的目前行程 ID 是：\n${currentTripId.value}\n\n(注意：此時行程尚未上傳。請在重整後，點擊側邊欄的「上傳並開啟協作」按鈕。)`);
+                        
                         showFirebaseSetup.value = false;
                         location.reload();
                     } catch (e) {
