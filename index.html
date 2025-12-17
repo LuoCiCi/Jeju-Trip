@@ -703,16 +703,12 @@
                 const saveFirebaseConfig = () => {
                     try {
                         let input = firebaseConfigInput.value.trim();
-                        // 移除常見的 JS 宣告字串
                         input = input.replace(/const\s+\w+\s*=\s*/, '').replace(/;/g, '');
                         
                         let config;
                         try {
-                            // 嘗試標準 JSON
                             config = JSON.parse(input);
                         } catch (e) {
-                            // 嘗試解析 JS Object (Firebase 預設格式通常 key 沒有引號)
-                            // 使用 new Function 來解析物件字面值
                             config = new Function(`return ${input}`)();
                         }
 
@@ -721,7 +717,10 @@
                         }
 
                         localStorage.setItem('travel_app_firebase_config', JSON.stringify(config));
-                        alert('設定已儲存！請重新整理頁面以生效。');
+                        // Auto-open menu on next load
+                        localStorage.setItem('travel_app_open_menu', 'true');
+                        
+                        alert('設定已儲存！頁面將重新整理。\n\n重整後，請再次打開選單，點擊「上傳並開啟協作」來取得行程 ID。');
                         showFirebaseSetup.value = false;
                         location.reload();
                     } catch (e) {
@@ -745,24 +744,16 @@
                     hasFirebaseConfig.value = true;
                     
                     try {
-                        // Check if already initialized to avoid errors
                         let app;
                         try { app = initializeApp(config); } catch(e) { /* already exists? */ }
-                        
-                        // If standard init fails, it might be due to existing default app, 
-                        // but since we reload on config change, basic init should work.
-                        // We use a simple pattern here.
                         
                         db = getFirestore(app);
                         auth = getAuth(app);
                         
-                        // User might rely on anonymous auth for public db access
                         await signInAnonymously(auth);
-                        
                         onAuthStateChanged(auth, u => user.value = u);
                     } catch(e) { 
                         console.error("Firebase init failed:", e); 
-                        // alert("Firebase 連線失敗，請檢查設定: " + e.message);
                     }
                 };
 
@@ -791,9 +782,10 @@
                         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), dataToSave);
                         subscribeToTrip(tripId);
                         isShared.value = true;
-                        // Add alert for clarity
+                        
+                        // Updated success message
                         alert(`上傳成功！\n\n您的行程 ID 為：\n${tripId}\n\n已複製到剪貼簿 (如果瀏覽器支援)，或請手動複製分享給朋友。`);
-                        navigator.clipboard.writeText(tripId).catch(() => {}); // Try to copy automatically
+                        navigator.clipboard.writeText(tripId).catch(() => {}); 
                     } catch(e) { alert("上傳失敗: " + e.message); }
                 };
 
@@ -802,7 +794,6 @@
                     if (!code) return;
                     if (!user.value) { await initFirebase(); }
                     
-                    // 檢查是否存在
                     if (!db) { alert("請先設定 Firebase"); return; }
 
                     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'trips', code);
@@ -812,13 +803,11 @@
                          return;
                     }
 
-                    // 加入成功，切換 ID 並監聽
                     currentTripId.value = code;
                     subscribeToTrip(code);
                     isShared.value = true;
                     joinCodeInput.value = '';
                     
-                    // 若要保存到本地列表供下次使用
                     const meta = { id: code, destination: snap.data().setup?.destination || '雲端行程', startDate: snap.data().setup?.startDate, daysCount: snap.data().setup?.days };
                     if (!tripList.value.find(t => t.id === code)) {
                         tripList.value.unshift(meta);
@@ -856,7 +845,6 @@
                     }
                 };
                 
-                // Debounce sync
                 let timeout = null;
                 const debouncedSync = () => {
                     clearTimeout(timeout);
@@ -1052,6 +1040,12 @@
                         switchTrip(tripList.value[0].id); // Load latest
                     } else {
                         showSetupModal.value = true; // First time
+                    }
+                    
+                    // UX Improvement: Check if we need to auto-open menu (after setup)
+                    if (localStorage.getItem('travel_app_open_menu')) {
+                        showTripMenu.value = true;
+                        localStorage.removeItem('travel_app_open_menu');
                     }
                     
                     // Watchers for Auto-Save
