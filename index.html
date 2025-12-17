@@ -488,7 +488,8 @@
 
     <script type="module">
         import { createApp, ref, computed, watch, onMounted, nextTick, reactive } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js'
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        // FIX: Import getApp to handle duplicate initialization
+        import { initializeApp, getApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -730,7 +731,7 @@
                         localStorage.setItem('travel_app_firebase_config', JSON.stringify(config));
                         localStorage.setItem('travel_app_open_menu', 'true');
                         
-                        alert('設定已儲存！頁面將重新整理。\n\n重整後，請再次打開選單，點擊「上傳並開啟協作」按鈕。');
+                        alert(`設定已儲存！頁面將重新整理。\n\n您的目前行程 ID 是：\n${currentTripId.value}\n\n(注意：此時行程尚未上傳。請在重整後，點擊側邊欄的「上傳並開啟協作」按鈕。)`);
                         showFirebaseSetup.value = false;
                         location.reload();
                     } catch (e) {
@@ -755,7 +756,12 @@
                     
                     try {
                         let app;
-                        try { app = initializeApp(config); } catch(e) { /* already exists? */ }
+                        try { 
+                            app = initializeApp(config); 
+                        } catch(e) { 
+                            // Handle duplicate app initialization by retrieving the existing app
+                            app = getApp();
+                        }
                         
                         db = getFirestore(app);
                         auth = getAuth(app);
@@ -764,13 +770,17 @@
                         onAuthStateChanged(auth, u => user.value = u);
                     } catch(e) { 
                         console.error("Firebase init failed:", e); 
+                        alert("Firebase 連線失敗：\n" + e.message + "\n\n請檢查您的 Config 設定是否正確。");
                     }
                 };
 
                 const startSharing = async () => {
-                    if (!user.value) { await initFirebase(); }
+                    // Try to init if not ready
+                    if (!user.value || !db) { await initFirebase(); }
+                    
+                    // Check again
                     if (!db || !user.value) {
-                        alert("請先設定 Firebase (點擊上方的設定按鈕)");
+                        alert("連線失敗：無法連接到 Firebase。\n請點擊上方的「設定 Firebase」按鈕檢查設定。");
                         return;
                     }
                     
@@ -793,7 +803,6 @@
                         subscribeToTrip(tripId);
                         isShared.value = true;
                         
-                        // Updated success message
                         alert(`上傳成功！\n\n您的行程 ID 為：\n${tripId}\n\n已複製到剪貼簿 (如果瀏覽器支援)，或請手動複製分享給朋友。`);
                         navigator.clipboard.writeText(tripId).catch(() => {}); 
                     } catch(e) { alert("上傳失敗: " + e.message); }
@@ -802,10 +811,9 @@
                 const joinCloudTrip = async () => {
                     let code = joinCodeInput.value.trim();
                     if (!code) return;
-                    // Auto-fix common issue where spaces are copied
                     code = code.replace(/\s/g, ''); 
                     
-                    if (!user.value) { await initFirebase(); }
+                    if (!user.value || !db) { await initFirebase(); }
                     if (!db) { alert("請先設定 Firebase"); return; }
 
                     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'trips', code);
