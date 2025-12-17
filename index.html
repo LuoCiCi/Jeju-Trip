@@ -746,7 +746,7 @@
                      location.reload();
                 };
 
-                const initFirebase = async () => {
+                const initFirebase = async (silent = false) => {
                     const config = getFirebaseConfig();
                     if (!config) { 
                         hasFirebaseConfig.value = false;
@@ -770,17 +770,19 @@
                         onAuthStateChanged(auth, u => user.value = u);
                     } catch(e) { 
                         console.error("Firebase init failed:", e); 
-                        alert("Firebase 連線失敗：\n" + e.message + "\n\n請檢查您的 Config 設定是否正確。");
+                        if (!silent) {
+                             alert("Firebase 連線失敗：\n" + e.message + "\n\n請檢查您的 Config 設定是否正確。");
+                        }
                     }
                 };
 
                 const startSharing = async () => {
                     // Try to init if not ready
-                    if (!user.value || !db) { await initFirebase(); }
+                    if (!user.value || !db) { await initFirebase(false); }
                     
                     // Check again
                     if (!db || !user.value) {
-                        alert("連線失敗：無法連接到 Firebase。\n請點擊上方的「設定 Firebase」按鈕檢查設定。");
+                        // The explicit call above would have alerted, but double check
                         return;
                     }
                     
@@ -813,8 +815,8 @@
                     if (!code) return;
                     code = code.replace(/\s/g, ''); 
                     
-                    if (!user.value || !db) { await initFirebase(); }
-                    if (!db) { alert("請先設定 Firebase"); return; }
+                    if (!user.value || !db) { await initFirebase(false); }
+                    if (!db) { return; } // initFirebase would have alerted
 
                     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'trips', code);
                     try {
@@ -1060,7 +1062,7 @@
                 // --- Init ---
                 onMounted(() => {
                     loadTripList();
-                    initFirebase(); // Try auto-init if config exists
+                    initFirebase(true); // Try auto-init if config exists (Silent mode)
                     if (tripList.value.length > 0) {
                         switchTrip(tripList.value[0].id); // Load latest
                     } else {
